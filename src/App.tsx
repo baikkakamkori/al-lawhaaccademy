@@ -1,4 +1,3 @@
-react
 import React, { useState, useEffect } from 'react';
 import { 
   BookOpen, Users, LayoutDashboard, Settings, LogOut, Menu, X, ChevronRight, 
