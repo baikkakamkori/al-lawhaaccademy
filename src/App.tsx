@@ -1,3 +1,23 @@
+const getYouTubeEmbedUrl = (url: string) => {
+  try {
+    const parsed = new URL(url);
+    if (parsed.hostname === "youtu.be") {
+      const id = parsed.pathname.slice(1);
+      return id ? `https://www.youtube.com/embed/${id}` : url;
+    }
+    if (["www.youtube.com", "youtube.com", "m.youtube.com"].includes(parsed.hostname)) {
+      if (parsed.pathname === "/watch") {
+        const id = parsed.searchParams.get("v");
+        return id ? `https://www.youtube.com/embed/${id}` : url;
+      }
+      if (parsed.pathname.startsWith("/embed/")) return url;
+    }
+    return url;
+  } catch {
+    return url;
+  }
+};
+
 import React, { useState, useEffect } from 'react';
 import { 
   BookOpen, Users, LayoutDashboard, Settings, LogOut, Menu, X, ChevronRight, 
@@ -251,7 +271,7 @@ const LandingPage = ({ firebaseUser, db, appId, onNavigateToLogin }) => {
           <div className="flex flex-col h-full">
             <div className="flex items-center space-x-3 mb-6 border-b-2 border-emerald-500 pb-2 inline-flex"><PlayCircle className="text-emerald-600 h-7 w-7"/><h2 className="text-2xl font-bold text-gray-800">ক্যাম্পাস ওভারভিউ</h2></div>
             <div className="rounded-3xl overflow-hidden shadow-lg border border-gray-200 bg-black aspect-video relative flex-shrink-0 w-full">
-              {settings.videoUrl ? <iframe className="absolute top-0 left-0 w-full h-full" src={settings.videoUrl} title="School Video" frameBorder="0" allowFullScreen></iframe> : <div className="flex items-center justify-center h-full text-gray-400 flex-col bg-gray-900"><Youtube className="mb-3 opacity-30" size={56}/><p className="font-medium">ভিডিও লিংক যুক্ত করা হয়নি</p></div>}
+              {settings.videoUrl ? <iframe className="absolute top-0 left-0 w-full h-full" src={getYouTubeEmbedUrl(settings.videoUrl)} title="School Video" frameBorder="0" allowFullScreen></iframe> : <div className="flex items-center justify-center h-full text-gray-400 flex-col bg-gray-900"><Youtube className="mb-3 opacity-30" size={56}/><p className="font-medium">ভিডিও লিংক যুক্ত করা হয়নি</p></div>}
             </div>
           </div>
         </div>
