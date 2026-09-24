@@ -32,19 +32,13 @@ const defaultSiteSettings = {
   address: 'নাসিরাবাদ, চট্টগ্রাম, বাংলাদেশ',
   facebook: 'https://facebook.com',
   videoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ',
-  logoUrl: '',
+  logoUrl: 'https://i.ibb.co.com/ynKzkTnX/1000188468-removebg-preview.png',
   admissionTestLink: '', 
   admissionLink: '',
   googleScriptUrl: '',
-  feature1Title: 'কুরআনিক স্টাডিজ',
-  feature1Desc: 'প্রত্যয়িত আলেমদের দ্বারা পরিচালিত হিফজ এবং তাজবীদ প্রোগ্রাম যা শিক্ষার্থীদের কুরআনের আলোয় আলোকিত করে।',
-  feature2Title: 'আধুনিক কারিকুলাম',
-  feature2Desc: 'বিশ্বমানের চ্যালেঞ্জ মোকাবেলায় জাতীয় পাঠ্যক্রমের সাথে বিজ্ঞান, প্রযুক্তি ও সাধারণ শিক্ষার চমৎকার সমন্বয়।',
-  feature3Title: 'চরিত্র গঠন (তারবিয়াহ)',
-  feature3Desc: 'দৃঢ় নৈতিক চরিত্র, শৃঙ্খলা, সময়ানুবর্তিতা এবং সমাজসেবা বিকাশের উপর বিশেষ জোর দেওয়া হয়।'
+  mapEmbedUrl: ''
 };
 
-// --- IMAGE PROCESSING UTILITY ---
 const processImage = (file: any) => {
   return new Promise((resolve, reject) => {
     if (!file) return reject("No file selected");
@@ -73,7 +67,6 @@ export default function App() {
   const [dashboardType, setDashboardType] = useState('sms'); 
   const [loggedInUser, setLoggedInUser] = useState<any>(null);
   const [firebaseUser, setFirebaseUser] = useState<any>(null);
-  const [isLoading, setIsLoading] = useState(true);
 
   const [usersDb, setUsersDb] = useState<any>({
     sms_admin: { username: 'sms_admin', password: 'password123', role: 'School Admin', name: 'প্রধান শিক্ষক' },
@@ -82,10 +75,7 @@ export default function App() {
 
   useEffect(() => {
     signInAnonymously(auth).catch((error) => console.error("Firebase Error:", error));
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setFirebaseUser(user);
-      setTimeout(() => setIsLoading(false), 1000);
-    });
+    const unsubscribe = onAuthStateChanged(auth, (user) => setFirebaseUser(user));
     return () => unsubscribe();
   }, []);
 
@@ -115,15 +105,6 @@ export default function App() {
     return false;
   };
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-emerald-900 flex flex-col items-center justify-center">
-        <BookOpen className="h-16 w-16 text-emerald-400 animate-bounce mb-4" />
-        <h2 className="text-white text-xl font-bold tracking-widest animate-pulse">আল-লওহা ইসলামিক স্কুল</h2>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-gray-50 font-sans text-gray-900 overflow-x-hidden">
       <style>{`
@@ -144,8 +125,8 @@ export default function App() {
       {currentView === 'dashboard' && loggedInUser && (
         <DashboardLayout user={loggedInUser} onLogout={handleLogout} onChangePassword={handleChangePassword}>
           {dashboardType === 'sms' ? 
-            <SMSDashboard firebaseUser={firebaseUser} db={db} appId={appId} /> : 
-            <CMSDashboard firebaseUser={firebaseUser} db={db} appId={appId} />
+            <SMSDashboard firebaseUser={firebaseUser} db={db} appId={appId} activeView="dashboard" /> : 
+            <CMSDashboard firebaseUser={firebaseUser} db={db} appId={appId} activeView="dashboard" />
           }
         </DashboardLayout>
       )}
@@ -157,30 +138,81 @@ export default function App() {
 const LandingPage = ({ firebaseUser, db, appId, onNavigateToLogin }: any) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [showAdminMenu, setShowAdminMenu] = useState(false);
-  const [showAdmissionModal, setShowAdmissionModal] = useState(false);
-  
-  const [settings, setSettings] = useState<any>(defaultSiteSettings);
   const [notices, setNotices] = useState<any[]>([]);
   const [gallery, setGallery] = useState<any[]>([]);
+  const [alertMsg, setAlertMsg] = useState('');
+  
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Cache System for Instant Load
+  const [settings, setSettings] = useState<any>(() => {
+    const saved = localStorage.getItem('alLawhaSettings');
+    return saved ? JSON.parse(saved) : defaultSiteSettings;
+  });
 
   useEffect(() => {
     if (!firebaseUser || !db) return;
-    const unsubSettings = onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'main_config'), (docSnap) => {
-      if (docSnap.exists()) setSettings({ ...defaultSiteSettings, ...docSnap.data() } as any);
-    });
-    const unsubNotices = onSnapshot(query(collection(db, 'artifacts', appId, 'public', 'data', 'notices')), (snapshot) => {
-      setNotices(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).reverse());
-    });
-    const unsubGallery = onSnapshot(query(collection(db, 'artifacts', appId, 'public', 'data', 'gallery')), (snapshot) => {
-      setGallery(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    });
-    
-    return () => { unsubSettings(); unsubNotices(); unsubGallery(); };
+    try {
+      const unsubSettings = onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'main_config'), (docSnap) => {
+        if (docSnap.exists()) {
+          const newData = { ...defaultSiteSettings, ...docSnap.data() };
+          setSettings(newData);
+          localStorage.setItem('alLawhaSettings', JSON.stringify(newData)); // Save to cache
+        }
+        setIsLoading(false); // Stop loading once fetched
+      });
+      onSnapshot(query(collection(db, 'artifacts', appId, 'public', 'data', 'notices')), (snapshot) => {
+        setNotices(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).reverse());
+      });
+      onSnapshot(query(collection(db, 'artifacts', appId, 'public', 'data', 'gallery')), (snapshot) => {
+        setGallery(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      });
+
+      // Fallback
+      setTimeout(() => setIsLoading(false), 2500);
+      
+      return () => unsubSettings();
+    } catch(e) {
+      setIsLoading(false);
+    }
   }, [firebaseUser, db, appId]);
 
+  const handleAdmissionClick = (link: string) => {
+    if (link && link.trim() !== '') window.open(link, '_blank'); 
+    else setAlertMsg('এখন আবেদন স্থগিত করা হয়েছে, দয়া করে অফিস এ যোগাযোগ করুন।');
+  };
+
   const LogoDisplay = ({ className = "h-8 w-8" }) => (
-    settings.logoUrl ? <img src={settings.logoUrl} alt="Logo" className={`${className} object-contain`} /> : <BookOpen className={`${className} text-emerald-800`} />
+    (settings.logoUrl || defaultSiteSettings.logoUrl) ? <img src={settings.logoUrl || defaultSiteSettings.logoUrl} alt="Logo" className={`${className} object-contain`} /> : <BookOpen className={`${className} text-emerald-800`} />
   );
+
+  // --- PERFECTED LOADING SCREEN ---
+  if (isLoading) {
+    return (
+      <div className="fixed inset-0 bg-emerald-900 flex flex-col items-center justify-center z-[100] overflow-hidden">
+        <div className="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-emerald-400 to-transparent"></div>
+        
+        <div className="relative z-10 flex flex-col items-center animate-in fade-in zoom-in duration-700">
+          <div className="bg-white p-4 rounded-full shadow-2xl mb-8 flex items-center justify-center h-32 w-32 md:h-40 md:w-40 border-4 border-emerald-500/30 overflow-hidden relative">
+            {(settings.logoUrl || defaultSiteSettings.logoUrl) ? (
+              <img src={settings.logoUrl || defaultSiteSettings.logoUrl} alt="Logo" className="w-full h-full object-contain mix-blend-multiply" />
+            ) : (
+              <BookOpen className="h-16 w-16 md:h-20 md:w-20 text-emerald-800" />
+            )}
+          </div>
+          <h2 className="text-white text-2xl md:text-3xl font-extrabold tracking-widest drop-shadow-lg text-center px-4 mb-8">
+            আল-লওহা ইসলামিক স্কুল
+          </h2>
+          {/* Beautiful Dot Animation instead of Text */}
+          <div className="flex space-x-2">
+            <div className="w-3 h-3 bg-emerald-400 rounded-full animate-bounce"></div>
+            <div className="w-3 h-3 bg-emerald-400 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
+            <div className="w-3 h-3 bg-emerald-400 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col min-h-screen animate-in fade-in duration-500">
@@ -197,9 +229,7 @@ const LandingPage = ({ firebaseUser, db, appId, onNavigateToLogin }: any) => {
               <a href="#notices" className="hover:text-emerald-200 font-medium transition-colors">নোটিশ</a>
               <a href="#gallery" className="hover:text-emerald-200 font-medium transition-colors">গ্যালারি</a>
               <div className="relative">
-                <button onClick={() => setShowAdminMenu(!showAdminMenu)} className="bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-2.5 rounded-lg font-bold shadow-sm flex items-center transition-colors">
-                  লগইন পোর্টাল <ChevronRight className={`ml-1 h-4 w-4 transition-transform ${showAdminMenu ? 'rotate-90' : ''}`} />
-                </button>
+                <button onClick={() => setShowAdminMenu(!showAdminMenu)} className="bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-2.5 rounded-lg font-bold shadow-sm flex items-center transition-colors">লগইন পোর্টাল <ChevronRight className={`ml-1 h-4 w-4 transition-transform ${showAdminMenu ? 'rotate-90' : ''}`} /></button>
                 {showAdminMenu && (
                   <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-xl z-50 overflow-hidden border border-gray-100 text-gray-800">
                     <button onClick={() => onNavigateToLogin('sms')} className="w-full text-left px-5 py-4 hover:bg-emerald-50 border-b border-gray-100 flex items-center group transition-colors"><LayoutDashboard className="h-5 w-5 mr-3 text-emerald-600 group-hover:scale-110 transition-transform" /> <span className="font-medium">স্কুল ম্যানেজমেন্ট</span></button>
@@ -235,9 +265,10 @@ const LandingPage = ({ firebaseUser, db, appId, onNavigateToLogin }: any) => {
           <span className="bg-emerald-800 text-emerald-100 px-5 py-2 rounded-full text-sm font-bold mb-8 border border-emerald-600 shadow-sm inline-flex items-center"><span className="w-2 h-2 rounded-full bg-green-400 mr-2 animate-pulse"></span> ভর্তি চলছে!</span>
           <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight mb-6 max-w-4xl leading-tight drop-shadow-md">{settings.heroTitle}</h1>
           <p className="text-lg md:text-xl text-emerald-100 max-w-2xl mb-10 leading-relaxed px-4">{settings.heroSubtitle}</p>
+          
           <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto px-4 sm:px-0">
-            <button onClick={() => setShowAdmissionModal(true)} className="w-full sm:w-auto bg-white text-emerald-900 px-8 py-4 rounded-xl font-bold text-lg hover:bg-gray-100 transition shadow-xl hover:-translate-y-1 transform">ভর্তির আবেদন করুন</button>
-            <a href="#notices" className="w-full sm:w-auto border-2 border-emerald-500 text-white px-8 py-4 rounded-xl font-bold text-lg hover:bg-emerald-800 transition flex items-center justify-center">নোটিশ দেখুন</a>
+            <button onClick={() => handleAdmissionClick(settings.admissionTestLink)} className="w-full sm:w-auto bg-white text-emerald-900 px-8 py-4 rounded-xl font-bold text-lg hover:bg-gray-100 transition shadow-xl hover:-translate-y-1 transform">ভর্তি পরীক্ষার আবেদন</button>
+            <button onClick={() => handleAdmissionClick(settings.admissionLink)} className="w-full sm:w-auto bg-emerald-700 border border-emerald-500 text-white px-8 py-4 rounded-xl font-bold text-lg hover:bg-emerald-600 transition shadow-xl hover:-translate-y-1 transform">সরাসরি ভর্তি</button>
           </div>
         </div>
       </div>
@@ -245,9 +276,21 @@ const LandingPage = ({ firebaseUser, db, appId, onNavigateToLogin }: any) => {
       <div className="py-16 md:py-24 bg-white" id="about">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="bg-emerald-50 rounded-3xl p-8 border border-emerald-100 hover:shadow-lg transition-all duration-300 hover:-translate-y-1"><div className="bg-emerald-100 w-16 h-16 rounded-2xl flex items-center justify-center mb-6"><BookOpen className="h-8 w-8 text-emerald-700" /></div><h3 className="text-2xl font-bold text-gray-900 mb-3">{settings.feature1Title}</h3><p className="text-gray-600 leading-relaxed">{settings.feature1Desc}</p></div>
-            <div className="bg-emerald-50 rounded-3xl p-8 border border-emerald-100 hover:shadow-lg transition-all duration-300 hover:-translate-y-1"><div className="bg-emerald-100 w-16 h-16 rounded-2xl flex items-center justify-center mb-6"><Award className="h-8 w-8 text-emerald-700" /></div><h3 className="text-2xl font-bold text-gray-900 mb-3">{settings.feature2Title}</h3><p className="text-gray-600 leading-relaxed">{settings.feature2Desc}</p></div>
-            <div className="bg-emerald-50 rounded-3xl p-8 border border-emerald-100 hover:shadow-lg transition-all duration-300 hover:-translate-y-1"><div className="bg-emerald-100 w-16 h-16 rounded-2xl flex items-center justify-center mb-6"><Users className="h-8 w-8 text-emerald-700" /></div><h3 className="text-2xl font-bold text-gray-900 mb-3">{settings.feature3Title}</h3><p className="text-gray-600 leading-relaxed">{settings.feature3Desc}</p></div>
+            <div className="bg-emerald-50 rounded-3xl p-8 border border-emerald-100 hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
+              <div className="bg-emerald-100 w-16 h-16 rounded-2xl flex items-center justify-center mb-6"><BookOpen className="h-8 w-8 text-emerald-700" /></div>
+              <h3 className="text-2xl font-bold text-gray-900 mb-3">{settings.feature1Title || 'কুরআনিক স্টাডিজ'}</h3>
+              <p className="text-gray-600 leading-relaxed">{settings.feature1Desc || 'প্রত্যয়িত আলেমদের দ্বারা পরিচালিত হিফজ এবং তাজবীদ প্রোগ্রাম যা শিক্ষার্থীদের কুরআনের আলোয় আলোকিত করে।'}</p>
+            </div>
+            <div className="bg-emerald-50 rounded-3xl p-8 border border-emerald-100 hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
+              <div className="bg-emerald-100 w-16 h-16 rounded-2xl flex items-center justify-center mb-6"><Award className="h-8 w-8 text-emerald-700" /></div>
+              <h3 className="text-2xl font-bold text-gray-900 mb-3">{settings.feature2Title || 'আধুনিক কারিকুলাম'}</h3>
+              <p className="text-gray-600 leading-relaxed">{settings.feature2Desc || 'বিশ্বমানের চ্যালেঞ্জ মোকাবেলায় জাতীয় পাঠ্যক্রমের সাথে বিজ্ঞান, প্রযুক্তি ও সাধারণ শিক্ষার চমৎকার সমন্বয়।'}</p>
+            </div>
+            <div className="bg-emerald-50 rounded-3xl p-8 border border-emerald-100 hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
+              <div className="bg-emerald-100 w-16 h-16 rounded-2xl flex items-center justify-center mb-6"><Users className="h-8 w-8 text-emerald-700" /></div>
+              <h3 className="text-2xl font-bold text-gray-900 mb-3">{settings.feature3Title || 'চরিত্র গঠন (তারবিয়াহ)'}</h3>
+              <p className="text-gray-600 leading-relaxed">{settings.feature3Desc || 'দৃঢ় নৈতিক চরিত্র, শৃঙ্খলা, সময়ানুবর্তিতা এবং সমাজসেবা বিকাশের উপর বিশেষ জোর দেওয়া হয়।'}</p>
+            </div>
           </div>
         </div>
       </div>
@@ -284,6 +327,12 @@ const LandingPage = ({ firebaseUser, db, appId, onNavigateToLogin }: any) => {
         </div>
       </div>
 
+      {settings.mapEmbedUrl && (
+        <div className="w-full h-80 md:h-96 border-t border-gray-200">
+          <iframe src={settings.mapEmbedUrl} width="100%" height="100%" style={{border:0}} allowFullScreen loading="lazy" referrerPolicy="no-referrer-when-downgrade" title="School Map"></iframe>
+        </div>
+      )}
+
       <footer className="bg-gray-900 text-gray-300 pt-16 pb-8 mt-auto border-t-4 border-emerald-600">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 lg:gap-8 mb-12">
           <div className="lg:col-span-2">
@@ -297,73 +346,20 @@ const LandingPage = ({ firebaseUser, db, appId, onNavigateToLogin }: any) => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 border-t border-gray-800 text-sm text-center text-gray-500"><p>&copy; {new Date().getFullYear()} আল-লওহা ইসলামিক স্কুল চট্টগ্রাম। সর্বস্বত্ব সংরক্ষিত।</p></div>
       </footer>
 
-      {/* Admission Modal */}
-      {showAdmissionModal && (
-        <AdmissionModal onClose={() => setShowAdmissionModal(false)} firebaseUser={firebaseUser} db={db} appId={appId} />
+      {alertMsg && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden relative p-8 text-center animate-in fade-in zoom-in duration-200">
+            <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4 text-red-500"><AlertCircle size={32} /></div>
+            <h3 className="text-xl font-bold text-gray-800 mb-2">আবেদন স্থগিত</h3>
+            <p className="text-gray-600 mb-6">{alertMsg}</p>
+            <button onClick={() => setAlertMsg('')} className="bg-emerald-600 text-white font-bold py-3 px-8 rounded-xl hover:bg-emerald-700 w-full shadow-lg">ঠিক আছে</button>
+          </div>
+        </div>
       )}
     </div>
   );
 };
 
-// --- ADMISSION MODAL ---
-const AdmissionModal = ({ onClose, firebaseUser, db, appId }: any) => {
-  const [formData, setFormData] = useState({ name: '', phone: '', address: '', grade: 'প্লে' });
-  const [status, setStatus] = useState('');
-
-  const handleSubmit = async (e: any) => {
-    e.preventDefault();
-    setStatus('সাবমিট করা হচ্ছে...');
-    try {
-      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'admissions'), {
-        ...formData, date: new Date().toLocaleDateString('bn-BD'), status: 'Pending'
-      });
-      setStatus('আপনার আবেদন সফলভাবে জমা হয়েছে! স্কুল থেকে যোগাযোগ করা হবে।');
-      setTimeout(onClose, 3000);
-    } catch (error) {
-      setStatus('আবেদন জমা দিতে সমস্যা হয়েছে।');
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden relative animate-in fade-in zoom-in duration-200">
-        <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-800 bg-gray-100 p-2 rounded-full"><X size={20}/></button>
-        <div className="bg-emerald-600 px-8 py-6 text-white text-center">
-          <h2 className="text-2xl font-bold">ভর্তির আবেদন ফর্ম</h2>
-          <p className="text-emerald-100 text-sm mt-1">২০২৬-২৭ শিক্ষাবর্ষ</p>
-        </div>
-        <form onSubmit={handleSubmit} className="p-8 space-y-5">
-          {status && <div className={`p-4 rounded-xl text-sm font-bold text-center ${status.includes('সফল') ? 'bg-green-100 text-green-700' : 'bg-blue-50 text-blue-700'}`}>{status}</div>}
-          <div>
-            <label className="block text-sm font-bold text-gray-700 mb-2">শিক্ষার্থীর নাম</label>
-            <input required type="text" value={formData.name} onChange={e=>setFormData({...formData, name: e.target.value})} className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none" />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-bold text-gray-700 mb-2">অভিভাবকের মোবাইল</label>
-              <input required type="text" value={formData.phone} onChange={e=>setFormData({...formData, phone: e.target.value})} className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none" />
-            </div>
-            <div>
-              <label className="block text-sm font-bold text-gray-700 mb-2">ভর্তির শ্রেণী</label>
-              <select value={formData.grade} onChange={e=>setFormData({...formData, grade: e.target.value})} className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none bg-white">
-                <option>প্লে</option><option>নার্সারি</option><option>ক্লাস ১</option><option>ক্লাস ২</option><option>হিফজ সেকশন</option>
-              </select>
-            </div>
-          </div>
-          <div>
-            <label className="block text-sm font-bold text-gray-700 mb-2">বর্তমান ঠিকানা</label>
-            <textarea required value={formData.address} onChange={e=>setFormData({...formData, address: e.target.value})} className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none" rows={2}></textarea>
-          </div>
-          <button type="submit" disabled={status !== ''} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-4 rounded-xl shadow-lg transition-transform hover:-translate-y-0.5 mt-4 disabled:opacity-50">
-            আবেদন জমা দিন
-          </button>
-        </form>
-      </div>
-    </div>
-  );
-};
-
-// --- LOGIN PAGE ---
 const LoginPage = ({ type, onLogin, onBack, onSwitchType }: any) => {
   const [username, setUsername] = useState(''); const [password, setPassword] = useState(''); const [showPassword, setShowPassword] = useState(false); const [error, setError] = useState('');
   const handleSubmit = (e: any) => { e.preventDefault(); if (!onLogin(username, password, type)) setError('ভুল ইউজারনেম বা পাসওয়ার্ড।'); };
@@ -411,8 +407,14 @@ const ChangePasswordModal = ({ user, onClose, onChangePassword, themeColor }: an
 };
 
 const DashboardLayout = ({ user, onLogout, onChangePassword, children }: any) => {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false); const [activeTab, setActiveTab] = useState('dashboard'); const [showProfileMenu, setShowProfileMenu] = useState(false); const [showPasswordModal, setShowPasswordModal] = useState(false);
-  const isSMS = user.type === 'sms'; const themeColor = isSMS ? 'emerald' : 'blue';
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false); 
+  const [activeTab, setActiveTab] = useState('dashboard'); 
+  const [showProfileMenu, setShowProfileMenu] = useState(false); 
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  
+  const isSMS = user.type === 'sms'; 
+  const themeColor = isSMS ? 'emerald' : 'blue';
+  
   const handleSidebarNav = (tab: string) => { setActiveTab(tab); setIsSidebarOpen(false); };
 
   return (
@@ -426,7 +428,6 @@ const DashboardLayout = ({ user, onLogout, onChangePassword, children }: any) =>
               <SidebarItem icon={<LayoutDashboard size={20}/>} label="ড্যাশবোর্ড ওভারভিউ" active={activeTab==='dashboard'} onClick={()=>handleSidebarNav('dashboard')} color={themeColor} />
               <SidebarItem icon={<Users size={20}/>} label="শিক্ষার্থীর তালিকা" active={activeTab==='students'} onClick={()=>handleSidebarNav('students')} color={themeColor} />
               <SidebarItem icon={<Wallet size={20}/>} label="অ্যাকাউন্টস ও ফিন্যান্স" active={activeTab==='finance'} onClick={()=>handleSidebarNav('finance')} color={themeColor} />
-              <SidebarItem icon={<FileCheck size={20}/>} label="ভর্তির আবেদন" active={activeTab==='admissions'} onClick={()=>handleSidebarNav('admissions')} color={themeColor} />
               <SidebarItem icon={<Printer size={20}/>} label="সার্টিফিকেট ও টিসি" active={activeTab==='certificate'} onClick={()=>handleSidebarNav('certificate')} color={themeColor} />
             </>
           ) : (
@@ -460,13 +461,13 @@ const SidebarItem = ({ icon, label, active, color, onClick }: any) => (
   <button onClick={onClick} className={`w-full flex items-center space-x-3 px-4 py-3.5 rounded-xl transition-all duration-200 ${active ? `bg-${color}-800 text-white shadow-md font-bold` : `text-${color}-100 hover:bg-${color}-800/50 hover:text-white font-medium`}`}>{icon} <span>{label}</span></button>
 );
 
-// --- CERTIFICATE GENERATOR ---
 const CertificateDashboard = ({ db, appId }: any) => {
   const [searchId, setSearchId] = useState('');
   const [studentData, setStudentData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [scriptUrl, setScriptUrl] = useState('');
+  const [printType, setPrintType] = useState('tc'); 
 
   useEffect(() => {
     onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'main_config'), (docSnap) => {
@@ -494,23 +495,62 @@ const CertificateDashboard = ({ db, appId }: any) => {
       <div className="no-print bg-white rounded-2xl shadow-sm border border-gray-100 p-6 md:p-8 mb-6">
         <h2 className="text-2xl font-bold mb-6 text-gray-800 flex items-center"><Printer className="mr-3 text-emerald-600"/> সার্টিফিকেট ও টিসি তৈরি করুন</h2>
         <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-4 mb-4">
-          <input type="text" placeholder="স্টুডেন্ট আইডি লিখুন..." value={searchId} onChange={e=>setSearchId(e.target.value)} className="flex-1 border border-gray-300 p-3.5 rounded-xl focus:ring-2 outline-none font-bold text-lg" required/>
-          <button type="submit" disabled={loading} className="bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-3.5 rounded-xl font-bold flex items-center justify-center transition-all disabled:opacity-70">{loading ? 'খোঁজা হচ্ছে...' : <><Search className="mr-2" size={20}/> সার্চ করুন</>}</button>
+          <input type="text" placeholder="স্টুডেন্ট আইডি (ID) লিখুন..." value={searchId} onChange={e=>setSearchId(e.target.value)} className="flex-1 border border-gray-300 p-3.5 rounded-xl focus:ring-2 outline-none font-bold text-lg" required/>
+          <button type="submit" disabled={loading} className="bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-3.5 rounded-xl font-bold flex items-center justify-center transition-all disabled:opacity-70">
+            {loading ? 'খোঁজা হচ্ছে...' : <><Search className="mr-2" size={20}/> সার্চ করুন</>}
+          </button>
         </form>
         {errorMsg && <p className="text-red-600 font-bold bg-red-50 p-3 rounded-lg border border-red-100">{errorMsg}</p>}
       </div>
 
       {studentData && (
         <>
-          <div className="no-print flex justify-end mb-4"><button onClick={() => window.print()} className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-xl font-bold flex items-center shadow-lg transform hover:-translate-y-1 transition-all"><Printer className="mr-2" size={20}/> প্রিন্ট করুন</button></div>
-          <div id="printable-tc" className="bg-white p-12 border-8 border-double border-emerald-900 mx-auto max-w-4xl relative overflow-hidden shadow-2xl">
-            <div className="absolute inset-0 flex items-center justify-center opacity-5 pointer-events-none"><BookOpen size={400} /></div>
-            <div className="text-center mb-8 border-b-2 border-gray-300 pb-6 relative z-10"><h1 className="text-4xl font-extrabold text-emerald-900 mb-2">আল-লওহা ইসলামিক স্কুল</h1><p className="text-gray-600 font-medium">নাসিরাবাদ, চট্টগ্রাম, বাংলাদেশ</p><div className="inline-block bg-emerald-800 text-white font-bold px-6 py-2 rounded-full mt-6 text-xl tracking-widest border-2 border-emerald-900 outline outline-2 outline-offset-2 outline-emerald-800">TRANSFER CERTIFICATE (TC)</div></div>
-            <div className="space-y-6 text-lg relative z-10">
-              <p className="leading-loose">This is to certify that <span className="font-bold border-b border-dashed border-gray-500 px-4 text-emerald-900">{studentData.Name || studentData.name || '---'}</span>, Student ID: <span className="font-bold border-b border-dashed border-gray-500 px-4">{studentData.ID || studentData.id || searchId}</span>, son/daughter of <span className="font-bold border-b border-dashed border-gray-500 px-4">{studentData.FatherName || studentData.fatherName || '---'}</span> and <span className="font-bold border-b border-dashed border-gray-500 px-4">{studentData.MotherName || studentData.motherName || '---'}</span> was a student of this institution in Class <span className="font-bold border-b border-dashed border-gray-500 px-4">{studentData.Class || studentData.class || '---'}</span>.</p>
-              <p className="leading-loose mt-4">To the best of my knowledge, he/she bears a good moral character. I wish him/her every success in life.</p>
+          <div className="no-print flex justify-between items-center mb-6 bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
+            <div className="flex space-x-2">
+              <button onClick={() => setPrintType('tc')} className={`px-6 py-2 rounded-lg font-bold transition-all ${printType === 'tc' ? 'bg-emerald-600 text-white shadow-md' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>TC টেমপ্লেট</button>
+              <button onClick={() => setPrintType('result')} className={`px-6 py-2 rounded-lg font-bold transition-all ${printType === 'result' ? 'bg-blue-600 text-white shadow-md' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>মার্কশিট (Result)</button>
             </div>
-            <div className="flex justify-between mt-24 pt-8 relative z-10"><div className="text-center"><div className="w-48 border-t-2 border-gray-800 mb-2"></div><p className="font-bold text-gray-700">Prepared By</p></div><div className="text-center"><div className="w-48 border-t-2 border-gray-800 mb-2"></div><p className="font-bold text-gray-700">Headmaster / Principal</p></div></div><div className="text-center mt-12 text-sm text-gray-400">Date of Issue: {new Date().toLocaleDateString()}</div>
+            <button onClick={() => window.print()} className="bg-gray-900 hover:bg-black text-white px-8 py-2.5 rounded-xl font-bold flex items-center shadow-lg transform hover:-translate-y-0.5 transition-all"><Printer className="mr-2" size={20}/> প্রিন্ট করুন</button>
+          </div>
+
+          <div id="printable-tc" className="bg-white p-12 border-8 border-double border-gray-900 mx-auto max-w-4xl relative overflow-hidden shadow-2xl min-h-[800px]">
+            <div className="absolute inset-0 flex items-center justify-center opacity-5 pointer-events-none"><BookOpen size={400} /></div>
+            
+            <div className="text-center mb-8 border-b-2 border-gray-300 pb-6 relative z-10">
+              <h1 className="text-4xl font-extrabold text-gray-900 mb-2">আল-লওহা ইসলামিক স্কুল</h1>
+              <p className="text-gray-600 font-medium">নাসিরাবাদ, চট্টগ্রাম, বাংলাদেশ</p>
+              <div className={`inline-block text-white font-bold px-8 py-2 rounded-full mt-6 text-xl tracking-widest border-2 outline outline-2 outline-offset-2 ${printType === 'tc' ? 'bg-emerald-800 border-emerald-900 outline-emerald-800' : 'bg-blue-800 border-blue-900 outline-blue-800'}`}>
+                {printType === 'tc' ? 'TRANSFER CERTIFICATE (TC)' : 'ACADEMIC MARK SHEET'}
+              </div>
+            </div>
+
+            {printType === 'tc' ? (
+              <div className="space-y-8 text-xl relative z-10 leading-loose text-justify mt-12">
+                <p>This is to certify that <span className="font-bold border-b-2 border-dotted border-gray-800 px-4 text-emerald-900">{studentData.Name || studentData.name || '---'}</span>, Student ID: <span className="font-bold border-b-2 border-dotted border-gray-800 px-4">{studentData.ID || studentData.id || searchId}</span>, son/daughter of <span className="font-bold border-b-2 border-dotted border-gray-800 px-4">{studentData.FatherName || studentData.fatherName || '---'}</span> and <span className="font-bold border-b-2 border-dotted border-gray-800 px-4">{studentData.MotherName || studentData.motherName || '---'}</span> was a student of this institution in Class <span className="font-bold border-b-2 border-dotted border-gray-800 px-4">{studentData.Class || studentData.class || '---'}</span>.</p>
+                <p>According to the school register, his/her date of birth is <span className="font-bold border-b-2 border-dotted border-gray-800 px-4">{studentData.DOB || studentData.dob || '---'}</span>. To the best of my knowledge, he/she bears a good moral character.</p>
+                <p className="font-bold text-center text-2xl mt-12 text-emerald-800 italic">I wish him/her every success in life.</p>
+              </div>
+            ) : (
+              <div className="relative z-10 mt-8">
+                <div className="grid grid-cols-2 gap-6 mb-8 text-lg bg-blue-50 p-6 rounded-xl border border-blue-100">
+                  <div><span className="font-bold text-gray-700">Student Name:</span> {studentData.Name || studentData.name || '---'}</div>
+                  <div><span className="font-bold text-gray-700">Student ID:</span> {studentData.ID || studentData.id || searchId}</div>
+                  <div><span className="font-bold text-gray-700">Class:</span> {studentData.Class || studentData.class || '---'}</div>
+                  <div><span className="font-bold text-gray-700">Date of Birth:</span> {studentData.DOB || studentData.dob || '---'}</div>
+                </div>
+                <div className="text-center bg-gray-100 p-8 rounded-2xl border-2 border-gray-200">
+                  <p className="text-gray-500 font-bold mb-2 uppercase tracking-widest">Final Result Status</p>
+                  <h2 className="text-5xl font-extrabold text-blue-900">{studentData.Result || studentData.result || 'PASSED'}</h2>
+                  {studentData.GPA && <p className="mt-4 text-2xl font-bold text-gray-700">GPA: {studentData.GPA}</p>}
+                </div>
+              </div>
+            )}
+
+            <div className="flex justify-between mt-32 pt-8 relative z-10">
+              <div className="text-center"><div className="w-48 border-t-2 border-gray-800 mb-2"></div><p className="font-bold text-gray-700">Prepared By</p></div>
+              <div className="text-center"><div className="w-48 border-t-2 border-gray-800 mb-2"></div><p className="font-bold text-gray-700">Headmaster / Principal</p></div>
+            </div>
+            <div className="text-center mt-12 text-sm text-gray-500 font-bold">Date of Issue: {new Date().toLocaleDateString()}</div>
           </div>
         </>
       )}
@@ -520,7 +560,6 @@ const CertificateDashboard = ({ db, appId }: any) => {
 
 const SMSDashboard = ({ firebaseUser, db, appId, activeView }: any) => {
   const [students, setStudents] = useState<any[]>([]); 
-  const [admissions, setAdmissions] = useState<any[]>([]);
   const [finances, setFinances] = useState<any[]>([]);
   const [name, setName] = useState(''); const [grade, setGrade] = useState('ক্লাস ১');
   const [finType, setFinType] = useState('Income'); const [finCategory, setFinCategory] = useState('ছাত্রীদের বেতন (Fees)'); const [finTitle, setFinTitle] = useState(''); const [finAmount, setFinAmount] = useState('');
@@ -530,7 +569,6 @@ const SMSDashboard = ({ firebaseUser, db, appId, activeView }: any) => {
     if (!firebaseUser || !db) return;
     try {
       onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'students'), (snap) => setStudents(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
-      onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'admissions'), (snap) => setAdmissions(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
       onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'finances'), (snap) => setFinances(snap.docs.map(d => ({ id: d.id, ...d.data() })).reverse()));
     } catch(e){}
   }, [firebaseUser, db, appId]);
@@ -540,18 +578,11 @@ const SMSDashboard = ({ firebaseUser, db, appId, activeView }: any) => {
   const handleAddFinance = async (e: any) => { e.preventDefault(); if (!firebaseUser || !finTitle || !finAmount) return; await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'finances'), { type: finType, category: finCategory, title: finTitle, amount: parseFloat(finAmount), date: new Date().toLocaleDateString('bn-BD') }); setFinTitle(''); setFinAmount(''); showMsg('হিসাব যুক্ত হয়েছে!'); };
 
   if (activeView === 'certificate') return <CertificateDashboard db={db} appId={appId} />;
-  
-  if (activeView === 'admissions') return (
-    <div className="max-w-6xl mx-auto bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-      <div className="p-6 md:p-8 border-b bg-gray-50 flex justify-between items-center"><h3 className="font-bold text-xl text-gray-800 flex items-center"><FileCheck className="mr-3 text-emerald-600"/> অনলাইন ভর্তি আবেদনসমূহ</h3><span className="bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full text-sm font-bold">{admissions.length} টি আবেদন</span></div>
-      <div className="overflow-x-auto"><table className="w-full text-left"><thead className="bg-white text-gray-500 text-sm uppercase"><tr className="border-b"><th className="p-4 px-6 font-semibold">নাম</th><th className="p-4 px-6 font-semibold">ফোন ও ঠিকানা</th><th className="p-4 px-6 font-semibold">শ্রেণী</th><th className="p-4 px-6 text-right">অ্যাকশন</th></tr></thead><tbody className="divide-y divide-gray-100">{admissions.length===0 ? <tr><td colSpan={4} className="text-center p-8 text-gray-400 font-medium">কোনো আবেদন নেই</td></tr> : admissions.map(a => (<tr key={a.id} className="hover:bg-gray-50"><td className="p-4 px-6 font-bold text-gray-800">{a.name}</td><td className="p-4 px-6"><p className="text-sm font-bold text-emerald-600">{a.phone}</p><p className="text-xs text-gray-500">{a.address}</p></td><td className="p-4 px-6 text-gray-600 font-bold">{a.grade}</td><td className="p-4 px-6 text-right"><button onClick={() => deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'admissions', a.id))} className="text-red-400 hover:text-white hover:bg-red-500 p-2 rounded-lg transition-colors inline-flex"><Trash2 size={18}/></button></td></tr>))}</tbody></table></div>
-    </div>
-  );
 
   if (activeView === 'students') return (
     <div className="max-w-6xl mx-auto space-y-6">
       {noticeMsg && <div className="bg-green-100 text-green-700 p-4 rounded-xl font-bold">{noticeMsg}</div>}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 md:p-8"><h2 className="text-2xl font-bold mb-6 text-gray-800 flex items-center"><Users className="mr-3 text-emerald-600"/> শিক্ষার্থী যুক্ত করুন</h2><form onSubmit={handleAddStudent} className="flex flex-col sm:flex-row gap-4"><input type="text" placeholder="নাম..." value={name} onChange={e=>setName(e.target.value)} className="flex-1 border border-gray-300 p-3.5 rounded-xl focus:ring-2 outline-none" required/><select value={grade} onChange={e=>setGrade(e.target.value)} className="w-full sm:w-48 border border-gray-300 p-3.5 rounded-xl focus:ring-2 outline-none bg-white"><option>প্লে</option><option>নার্সারি</option><option>ক্লাস ১</option><option>ক্লাস ২</option><option>হিফজ সেকশন</option></select><button type="submit" className="bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-3.5 rounded-xl font-bold transition-all sm:w-auto w-full">যুক্ত করুন</button></form></div>
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 md:p-8"><h2 className="text-2xl font-bold mb-6 text-gray-800 flex items-center"><Users className="mr-3 text-emerald-600"/> ম্যানুয়াল এন্ট্রি (ঐচ্ছিক)</h2><form onSubmit={handleAddStudent} className="flex flex-col sm:flex-row gap-4"><input type="text" placeholder="নাম..." value={name} onChange={e=>setName(e.target.value)} className="flex-1 border border-gray-300 p-3.5 rounded-xl focus:ring-2 outline-none" required/><select value={grade} onChange={e=>setGrade(e.target.value)} className="w-full sm:w-48 border border-gray-300 p-3.5 rounded-xl focus:ring-2 outline-none bg-white"><option>প্লে</option><option>নার্সারি</option><option>ক্লাস ১</option><option>ক্লাস ২</option><option>হিফজ সেকশন</option></select><button type="submit" className="bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-3.5 rounded-xl font-bold transition-all sm:w-auto w-full">যুক্ত করুন</button></form></div>
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden"><div className="p-6 md:p-8 border-b bg-gray-50 flex justify-between items-center"><h3 className="font-bold text-xl text-gray-800">শিক্ষার্থীর তালিকা</h3><span className="bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full text-sm font-bold">{students.length} জন</span></div><div className="overflow-x-auto"><table className="w-full text-left"><thead className="bg-white text-gray-500 text-sm uppercase tracking-wider"><tr className="border-b"><th className="p-4 px-6 font-semibold">নাম</th><th className="p-4 px-6 font-semibold">শ্রেণী</th><th className="p-4 px-6 font-semibold">তারিখ</th><th className="p-4 px-6 text-right">অ্যাকশন</th></tr></thead><tbody className="divide-y divide-gray-100">{students.map(s => (<tr key={s.id} className="hover:bg-gray-50"><td className="p-4 px-6 font-bold text-gray-800">{s.name}</td><td className="p-4 px-6 text-gray-600">{s.grade}</td><td className="p-4 px-6 text-gray-500">{s.date}</td><td className="p-4 px-6 text-right"><button onClick={() => deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'students', s.id))} className="text-red-400 hover:bg-red-50 p-2 rounded-lg"><Trash2 size={18} /></button></td></tr>))}</tbody></table></div></div>
     </div>
   );
@@ -572,8 +603,14 @@ const SMSDashboard = ({ firebaseUser, db, appId, activeView }: any) => {
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"><div className="bg-white rounded-2xl shadow-sm p-8 border border-gray-100 flex items-center space-x-6"><div className="bg-blue-500 text-white p-4 rounded-2xl shadow-lg shadow-blue-500/30"><Users size={32} /></div><div><p className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-1">মোট শিক্ষার্থী</p><h3 className="text-4xl font-extrabold text-gray-800">{students.length}</h3></div></div><div className="bg-white rounded-2xl shadow-sm p-8 border border-gray-100 flex items-center space-x-6"><div className="bg-emerald-500 text-white p-4 rounded-2xl shadow-lg shadow-emerald-500/30"><FileCheck size={32} /></div><div><p className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-1">নতুন আবেদন</p><h3 className="text-4xl font-extrabold text-gray-800">{admissions.length}</h3></div></div></div>
-      <div className="bg-gradient-to-br from-emerald-50 to-white rounded-2xl shadow-sm border border-emerald-100 p-10 relative overflow-hidden"><h3 className="text-2xl font-bold mb-3 text-emerald-900">স্বাগতম, স্কুল অ্যাডমিন!</h3><p className="text-gray-600 max-w-lg text-lg">বাম পাশের মেন্যু থেকে শিক্ষার্থী পরিচালনা, ഫিন্যান্স ম্যানেজ এবং <b>গুগল শিট থেকে টিসি (TC) জেনারেট</b> করতে পারবেন।</p></div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-6">
+        <div className="bg-white rounded-2xl shadow-sm p-8 border border-gray-100 flex items-center space-x-6"><div className="bg-blue-500 text-white p-4 rounded-2xl shadow-lg shadow-blue-500/30"><Users size={32} /></div><div><p className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-1">মোট শিক্ষার্থী</p><h3 className="text-4xl font-extrabold text-gray-800">{students.length}</h3></div></div>
+        <div className="bg-white rounded-2xl shadow-sm p-8 border border-gray-100 flex items-center space-x-6"><div className="bg-emerald-500 text-white p-4 rounded-2xl shadow-lg shadow-emerald-500/30"><Wallet size={32} /></div><div><p className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-1">মোট ফান্ড</p><h3 className="text-4xl font-extrabold text-gray-800">{finances.length}</h3></div></div>
+      </div>
+      <div className="bg-gradient-to-br from-emerald-50 to-white rounded-2xl shadow-sm border border-emerald-100 p-10 relative overflow-hidden">
+        <h3 className="text-2xl font-bold mb-3 text-emerald-900">স্বাগতম, স্কুল অ্যাডমিন!</h3>
+        <p className="text-gray-600 max-w-lg text-lg">বাম পাশের মেন্যু থেকে শিক্ষার্থী পরিচালনা, ফিন্যান্স ম্যানেজ এবং <b>গুগল শিট থেকে টিসি ও রেজাল্ট প্রিন্ট</b> করতে পারবেন।</p>
+      </div>
     </div>
   );
 };
@@ -606,16 +643,34 @@ const CMSDashboard = ({ firebaseUser, db, appId, activeView }: any) => {
       <h2 className="text-2xl font-bold mb-8 text-gray-800 border-b pb-4 flex items-center"><Settings className="mr-3 text-blue-600"/> ওয়েবসাইট সেটিংস ও লিংক</h2>
       {saveStatus && <div className={`mb-6 p-4 rounded-xl font-bold flex items-center ${saveStatus.includes('সফল') ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}><CheckCircle className="mr-2" size={20} /> {saveStatus}</div>}
       <form onSubmit={handleSaveSettings} className="space-y-6">
-        <div className="bg-gray-50 p-6 rounded-2xl border border-gray-200 flex flex-col sm:flex-row items-center gap-6"><div className="h-24 w-24 bg-white border-2 border-dashed border-gray-300 rounded-2xl flex items-center justify-center overflow-hidden">{settings.logoUrl ? <img src={settings.logoUrl} alt="Logo" className="w-full h-full object-contain" /> : <BookOpen className="text-gray-300 h-10 w-10"/>}</div><div className="flex-1 text-center sm:text-left"><h3 className="font-bold text-gray-800 mb-2">স্কুলের লোগো পরিবর্তন করুন</h3><label className="cursor-pointer bg-blue-100 hover:bg-blue-200 text-blue-800 px-4 py-2 rounded-lg font-bold inline-flex items-center transition-colors"><Upload className="mr-2" size={16} /> ছবি সিলেক্ট করুন<input type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" /></label></div></div>
+        <div className="bg-gray-50 p-6 rounded-2xl border border-gray-200 flex flex-col sm:flex-row items-center gap-6">
+          <div className="h-24 w-24 bg-white border-2 border-dashed border-gray-300 rounded-2xl flex items-center justify-center overflow-hidden">
+            {(settings.logoUrl || defaultSiteSettings.logoUrl) ? <img src={settings.logoUrl || defaultSiteSettings.logoUrl} alt="Logo" className="w-full h-full object-contain" /> : <BookOpen className="text-gray-300 h-10 w-10"/>}
+          </div>
+          <div className="flex-1 text-center sm:text-left">
+            <h3 className="font-bold text-gray-800 mb-2">স্কুলের লোগো পরিবর্তন করুন</h3>
+            <label className="cursor-pointer bg-blue-100 hover:bg-blue-200 text-blue-800 px-4 py-2 rounded-lg font-bold inline-flex items-center transition-colors">
+              <Upload className="mr-2" size={16} /> ছবি সিলেক্ট করুন
+              <input type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" />
+            </label>
+          </div>
+        </div>
         <div className="grid md:grid-cols-2 gap-6 pt-4"><div><label className="block text-sm font-bold text-gray-700 mb-2">ইমেইল ঠিকানা</label><input type="email" value={settings.email} onChange={e=>setSettings({...settings, email: e.target.value})} className="w-full border border-gray-300 p-3.5 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" /></div><div><label className="block text-sm font-bold text-gray-700 mb-2">ফোন নম্বর</label><input type="text" value={settings.phone} onChange={e=>setSettings({...settings, phone: e.target.value})} className="w-full border border-gray-300 p-3.5 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" /></div></div>
         <div><label className="block text-sm font-bold text-gray-700 mb-2">স্কুলের ঠিকানা</label><input type="text" value={settings.address} onChange={e=>setSettings({...settings, address: e.target.value})} className="w-full border border-gray-300 p-3.5 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" /></div>
-        <div className="grid md:grid-cols-2 gap-6"><div><label className="block text-sm font-bold text-gray-700 mb-2">ফেসবুক পেজ লিংক</label><input type="url" value={settings.facebook} onChange={e=>setSettings({...settings, facebook: e.target.value})} className="w-full border border-gray-300 p-3.5 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" /></div><div><label className="block text-sm font-bold text-gray-700 mb-2">হোমপেজ ভিডিও (YouTube Embed)</label><input type="url" value={settings.videoUrl} onChange={e=>setSettings({...settings, videoUrl: e.target.value})} className="w-full border border-gray-300 p-3.5 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" /></div></div>
+        <div className="grid md:grid-cols-2 gap-6"><div><label className="block text-sm font-bold text-gray-700 mb-2">ফেসবুক পেজ লিংক</label><input type="url" value={settings.facebook} onChange={e=>setSettings({...settings, facebook: e.target.value})} className="w-full border border-gray-300 p-3.5 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" /></div><div><label className="block text-sm font-bold text-gray-700 mb-2">হোমপেজ ভিডিও</label><input type="url" value={settings.videoUrl} onChange={e=>setSettings({...settings, videoUrl: e.target.value})} placeholder="https://www.youtube.com/embed/..." className="w-full border border-gray-300 p-3.5 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" /></div></div>
         
-        <div className="border-t border-gray-200 pt-8 mt-4"><h3 className="font-bold text-xl text-gray-800 mb-6 flex items-center"><FileCheck className="mr-2 text-blue-500"/> এক্সটার্নাল লিংক (Google Form & Sheet)</h3><div className="space-y-6"><div className="bg-blue-50 p-4 rounded-xl border border-blue-100"><label className="block text-sm font-bold text-blue-900 mb-2">Google Script (TC) লিংক</label><input type="url" value={settings.googleScriptUrl || ''} onChange={e=>setSettings({...settings, googleScriptUrl: e.target.value})} className="w-full border border-blue-200 p-3.5 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" /></div></div></div>
-
-        {/* Editable Features Section */}
         <div className="border-t border-gray-200 pt-8 mt-4">
-          <h3 className="font-bold text-xl text-gray-800 mb-6 flex items-center"><Award className="mr-2 text-blue-500"/> স্কুলের বৈশিষ্ট্য (Features)</h3>
+          <h3 className="font-bold text-xl text-gray-800 mb-6 flex items-center"><FileCheck className="mr-2 text-blue-500"/> এক্সটার্নাল লিংক (Google Form & Sheet)</h3>
+          <div className="space-y-6">
+            <div><label className="block text-sm font-bold text-gray-700 mb-2">ভর্তি পরীক্ষার ফরম লিংক (Google Form)</label><input type="url" value={settings.admissionTestLink || ''} onChange={e=>setSettings({...settings, admissionTestLink: e.target.value})} className="w-full border border-gray-300 p-3.5 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" placeholder="https://forms.gle/..." /></div>
+            <div><label className="block text-sm font-bold text-gray-700 mb-2">সরাসরি ভর্তির ফরম লিংক (Google Form)</label><input type="url" value={settings.admissionLink || ''} onChange={e=>setSettings({...settings, admissionLink: e.target.value})} className="w-full border border-gray-300 p-3.5 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" placeholder="https://forms.gle/..." /></div>
+            <div className="bg-blue-50 p-4 rounded-xl border border-blue-100"><label className="block text-sm font-bold text-blue-900 mb-2">Google Script (TC) লিংক</label><input type="url" value={settings.googleScriptUrl || ''} onChange={e=>setSettings({...settings, googleScriptUrl: e.target.value})} className="w-full border border-blue-200 p-3.5 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" placeholder="https://script.google.com/macros/s/.../exec" /></div>
+            <div><label className="block text-sm font-bold text-gray-700 mb-2">গুগোল ম্যাপ এম্বেড লিংক</label><input type="url" value={settings.mapEmbedUrl || ''} onChange={e=>setSettings({...settings, mapEmbedUrl: e.target.value})} className="w-full border border-gray-300 p-3.5 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" placeholder="https://www.google.com/maps/embed?pb=..." /></div>
+          </div>
+        </div>
+
+        <div className="border-t border-gray-200 pt-8 mt-4">
+          <h3 className="font-bold text-xl text-gray-800 mb-6 flex items-center"><Award className="mr-2 text-blue-500"/> স্কুলের বৈশিষ্ট্য (৩টি বক্স)</h3>
           <div className="space-y-6">
             <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
               <input type="text" value={settings.feature1Title || ''} onChange={e=>setSettings({...settings, feature1Title: e.target.value})} className="w-full border border-gray-300 p-3 rounded-lg mb-2 font-bold" placeholder="বক্স ১ এর শিরোনাম"/>
