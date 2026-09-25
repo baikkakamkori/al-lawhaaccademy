@@ -3,7 +3,8 @@ import {
   BookOpen, Users, LayoutDashboard, Settings, LogOut, Menu, X, ChevronRight, 
   Calendar, MapPin, Phone, Mail, Award, Lock, Eye, CheckCircle, Shield, 
   Trash2, Facebook, Youtube, PlayCircle, Globe, Upload, FileCheck, Wallet, 
-  ArrowDownRight, ArrowUpRight, Image as ImageIcon, FileText, AlertCircle, Printer, Search
+  ArrowDownRight, ArrowUpRight, Image as ImageIcon, FileText, AlertCircle, 
+  Printer, Search, MessageCircle
 } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
@@ -25,16 +26,15 @@ const db = getFirestore(app);
 const appId = 'al-lawha-school-db';
 
 const defaultSiteSettings = {
+  schoolNameBanner: 'আল-লওহা ইসলামিক স্কুল',
   heroTitle: 'বিশ্বাস এবং জ্ঞানের সাথে ভবিষ্যৎ গড়ার প্রতিশ্রুতি',
   heroSubtitle: 'আল-লওহা ইসলামিক স্কুল চট্টগ্রাম ঐতিহ্যবাহী ইসলামী শিক্ষা এবং আধুনিক শিক্ষার একটি সুরেলা সংমিশ্রণ প্রদান করে।',
   email: 'info@allawha-ctg.edu.bd',
-  phone: '+880 1234 567890',
+  phone: '+880 1616733447',
   address: 'নাসিরাবাদ, চট্টগ্রাম, বাংলাদেশ',
   facebook: 'https://facebook.com',
   videoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ',
   logoUrl: 'https://i.ibb.co.com/ynKzkTnX/1000188468-removebg-preview.png',
-  admissionTestLink: '', 
-  admissionLink: '',
   googleScriptUrl: '',
   mapEmbedUrl: ''
 };
@@ -138,13 +138,10 @@ export default function App() {
 const LandingPage = ({ firebaseUser, db, appId, onNavigateToLogin }: any) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [showAdminMenu, setShowAdminMenu] = useState(false);
+  const [showContactModal, setShowContactModal] = useState(false);
   const [notices, setNotices] = useState<any[]>([]);
   const [gallery, setGallery] = useState<any[]>([]);
-  const [alertMsg, setAlertMsg] = useState('');
-  
   const [isLoading, setIsLoading] = useState(true);
-
-  // Cache System for Instant Load
   const [settings, setSettings] = useState<any>(() => {
     const saved = localStorage.getItem('alLawhaSettings');
     return saved ? JSON.parse(saved) : defaultSiteSettings;
@@ -157,9 +154,9 @@ const LandingPage = ({ firebaseUser, db, appId, onNavigateToLogin }: any) => {
         if (docSnap.exists()) {
           const newData = { ...defaultSiteSettings, ...docSnap.data() };
           setSettings(newData);
-          localStorage.setItem('alLawhaSettings', JSON.stringify(newData)); // Save to cache
+          localStorage.setItem('alLawhaSettings', JSON.stringify(newData));
         }
-        setIsLoading(false); // Stop loading once fetched
+        setIsLoading(false); 
       });
       onSnapshot(query(collection(db, 'artifacts', appId, 'public', 'data', 'notices')), (snapshot) => {
         setNotices(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).reverse());
@@ -168,43 +165,33 @@ const LandingPage = ({ firebaseUser, db, appId, onNavigateToLogin }: any) => {
         setGallery(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       });
 
-      // Fallback
-      setTimeout(() => setIsLoading(false), 2500);
-      
+      setTimeout(() => setIsLoading(false), 2000);
       return () => unsubSettings();
     } catch(e) {
       setIsLoading(false);
     }
   }, [firebaseUser, db, appId]);
 
-  const handleAdmissionClick = (link: string) => {
-    if (link && link.trim() !== '') window.open(link, '_blank'); 
-    else setAlertMsg('এখন আবেদন স্থগিত করা হয়েছে, দয়া করে অফিস এ যোগাযোগ করুন।');
-  };
-
   const LogoDisplay = ({ className = "h-8 w-8" }) => (
     (settings.logoUrl || defaultSiteSettings.logoUrl) ? <img src={settings.logoUrl || defaultSiteSettings.logoUrl} alt="Logo" className={`${className} object-contain`} /> : <BookOpen className={`${className} text-emerald-800`} />
   );
 
-  // --- PERFECTED LOADING SCREEN ---
   if (isLoading) {
     return (
       <div className="fixed inset-0 bg-emerald-900 flex flex-col items-center justify-center z-[100] overflow-hidden">
         <div className="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-emerald-400 to-transparent"></div>
-        
         <div className="relative z-10 flex flex-col items-center animate-in fade-in zoom-in duration-700">
-          <div className="bg-white p-4 rounded-full shadow-2xl mb-8 flex items-center justify-center h-32 w-32 md:h-40 md:w-40 border-4 border-emerald-500/30 overflow-hidden relative">
+          <div className="bg-white p-4 rounded-full shadow-2xl mb-6 flex items-center justify-center h-32 w-32 md:h-40 md:w-40 border-4 border-emerald-500/30 overflow-hidden relative">
             {(settings.logoUrl || defaultSiteSettings.logoUrl) ? (
               <img src={settings.logoUrl || defaultSiteSettings.logoUrl} alt="Logo" className="w-full h-full object-contain mix-blend-multiply" />
             ) : (
               <BookOpen className="h-16 w-16 md:h-20 md:w-20 text-emerald-800" />
             )}
           </div>
-          <h2 className="text-white text-2xl md:text-3xl font-extrabold tracking-widest drop-shadow-lg text-center px-4 mb-8">
+          <h2 className="text-white text-2xl md:text-3xl font-extrabold tracking-widest drop-shadow-lg text-center px-4">
             আল-লওহা ইসলামিক স্কুল
           </h2>
-          {/* Beautiful Dot Animation instead of Text */}
-          <div className="flex space-x-2">
+          <div className="mt-8 flex space-x-2">
             <div className="w-3 h-3 bg-emerald-400 rounded-full animate-bounce"></div>
             <div className="w-3 h-3 bg-emerald-400 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
             <div className="w-3 h-3 bg-emerald-400 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
@@ -262,13 +249,27 @@ const LandingPage = ({ firebaseUser, db, appId, onNavigateToLogin }: any) => {
       <div className="relative bg-emerald-900 text-white flex flex-col justify-center min-h-[70vh] md:min-h-[80vh]">
         <div className="absolute inset-0 opacity-20 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-emerald-400 to-transparent mix-blend-overlay"></div>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-24 relative z-10 flex flex-col items-center text-center">
-          <span className="bg-emerald-800 text-emerald-100 px-5 py-2 rounded-full text-sm font-bold mb-8 border border-emerald-600 shadow-sm inline-flex items-center"><span className="w-2 h-2 rounded-full bg-green-400 mr-2 animate-pulse"></span> ভর্তি চলছে!</span>
-          <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight mb-6 max-w-4xl leading-tight drop-shadow-md">{settings.heroTitle}</h1>
-          <p className="text-lg md:text-xl text-emerald-100 max-w-2xl mb-10 leading-relaxed px-4">{settings.heroSubtitle}</p>
+          <span className="bg-emerald-800 text-emerald-100 px-5 py-2 rounded-full text-sm font-bold mb-6 border border-emerald-600 shadow-sm inline-flex items-center"><span className="w-2 h-2 rounded-full bg-green-400 mr-2 animate-pulse"></span> ভর্তি চলছে!</span>
           
-          <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto px-4 sm:px-0">
-            <button onClick={() => handleAdmissionClick(settings.admissionTestLink)} className="w-full sm:w-auto bg-white text-emerald-900 px-8 py-4 rounded-xl font-bold text-lg hover:bg-gray-100 transition shadow-xl hover:-translate-y-1 transform">ভর্তি পরীক্ষার আবেদন</button>
-            <button onClick={() => handleAdmissionClick(settings.admissionLink)} className="w-full sm:w-auto bg-emerald-700 border border-emerald-500 text-white px-8 py-4 rounded-xl font-bold text-lg hover:bg-emerald-600 transition shadow-xl hover:-translate-y-1 transform">সরাসরি ভর্তি</button>
+          {/* 1. School Name (Largest Font) */}
+          <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight mb-4 max-w-4xl leading-tight drop-shadow-md text-emerald-300">
+            {settings.schoolNameBanner || 'আল-লওহা ইসলামিক স্কুল'}
+          </h1>
+          
+          {/* 2. Main Title (Medium Font) */}
+          <h2 className="text-2xl md:text-4xl font-bold tracking-tight mb-6 max-w-4xl leading-tight drop-shadow-sm text-white">
+            {settings.heroTitle}
+          </h2>
+          
+          {/* 3. Short Description (Smallest Font) */}
+          <p className="text-base md:text-lg text-emerald-100 max-w-2xl mb-10 leading-relaxed px-4">
+            {settings.heroSubtitle}
+          </p>
+          
+          <div className="flex justify-center w-full px-4 sm:px-0">
+            <button onClick={() => setShowContactModal(true)} className="w-full sm:w-auto bg-white text-emerald-900 px-10 py-4 rounded-full font-extrabold text-xl hover:bg-gray-100 transition shadow-[0_0_20px_rgba(255,255,255,0.3)] hover:shadow-[0_0_25px_rgba(255,255,255,0.5)] hover:-translate-y-1 transform flex items-center justify-center">
+              <Phone className="mr-3 text-emerald-600" size={24}/> ভর্তির জন্য যোগাযোগ
+            </button>
           </div>
         </div>
       </div>
@@ -278,18 +279,18 @@ const LandingPage = ({ firebaseUser, db, appId, onNavigateToLogin }: any) => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <div className="bg-emerald-50 rounded-3xl p-8 border border-emerald-100 hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
               <div className="bg-emerald-100 w-16 h-16 rounded-2xl flex items-center justify-center mb-6"><BookOpen className="h-8 w-8 text-emerald-700" /></div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-3">{settings.feature1Title || 'কুরআনিক স্টাডিজ'}</h3>
-              <p className="text-gray-600 leading-relaxed">{settings.feature1Desc || 'প্রত্যয়িত আলেমদের দ্বারা পরিচালিত হিফজ এবং তাজবীদ প্রোগ্রাম যা শিক্ষার্থীদের কুরআনের আলোয় আলোকিত করে।'}</p>
+              <h3 className="text-2xl font-bold text-gray-900 mb-3">কুরআনিক স্টাডিজ</h3>
+              <p className="text-gray-600 leading-relaxed">প্রত্যয়িত আলেমদের দ্বারা পরিচালিত হিফজ এবং তাজবীদ প্রোগ্রাম যা শিক্ষার্থীদের কুরআনের আলোয় আলোকিত করে।</p>
             </div>
             <div className="bg-emerald-50 rounded-3xl p-8 border border-emerald-100 hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
               <div className="bg-emerald-100 w-16 h-16 rounded-2xl flex items-center justify-center mb-6"><Award className="h-8 w-8 text-emerald-700" /></div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-3">{settings.feature2Title || 'আধুনিক কারিকুলাম'}</h3>
-              <p className="text-gray-600 leading-relaxed">{settings.feature2Desc || 'বিশ্বমানের চ্যালেঞ্জ মোকাবেলায় জাতীয় পাঠ্যক্রমের সাথে বিজ্ঞান, প্রযুক্তি ও সাধারণ শিক্ষার চমৎকার সমন্বয়।'}</p>
+              <h3 className="text-2xl font-bold text-gray-900 mb-3">আধুনিক কারিকুলাম</h3>
+              <p className="text-gray-600 leading-relaxed">বিশ্বমানের চ্যালেঞ্জ মোকাবেলায় জাতীয় পাঠ্যক্রমের সাথে বিজ্ঞান, প্রযুক্তি ও সাধারণ শিক্ষার চমৎকার সমন্বয়।</p>
             </div>
             <div className="bg-emerald-50 rounded-3xl p-8 border border-emerald-100 hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
               <div className="bg-emerald-100 w-16 h-16 rounded-2xl flex items-center justify-center mb-6"><Users className="h-8 w-8 text-emerald-700" /></div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-3">{settings.feature3Title || 'চরিত্র গঠন (তারবিয়াহ)'}</h3>
-              <p className="text-gray-600 leading-relaxed">{settings.feature3Desc || 'দৃঢ় নৈতিক চরিত্র, শৃঙ্খলা, সময়ানুবর্তিতা এবং সমাজসেবা বিকাশের উপর বিশেষ জোর দেওয়া হয়।'}</p>
+              <h3 className="text-2xl font-bold text-gray-900 mb-3">চরিত্র গঠন (তারবিয়াহ)</h3>
+              <p className="text-gray-600 leading-relaxed">দৃঢ় নৈতিক চরিত্র, শৃঙ্খলা, সময়ানুবর্তিতা এবং সমাজসেবা বিকাশের উপর বিশেষ জোর দেওয়া হয়।</p>
             </div>
           </div>
         </div>
@@ -343,16 +344,30 @@ const LandingPage = ({ firebaseUser, db, appId, onNavigateToLogin }: any) => {
           <div><h3 className="text-white font-bold text-lg mb-6 flex items-center"><span className="w-8 h-1 bg-emerald-500 mr-3 rounded-full"></span> লিংক</h3><ul className="space-y-4"><li><a href="#about" className="text-gray-400 hover:text-emerald-400 flex items-center transition-colors"><ChevronRight className="mr-2" size={16} /> সম্পর্কে</a></li><li><a href="#notices" className="text-gray-400 hover:text-emerald-400 flex items-center transition-colors"><ChevronRight className="mr-2" size={16} /> নোটিশ</a></li><li><a href="#gallery" className="text-gray-400 hover:text-emerald-400 flex items-center transition-colors"><ChevronRight className="mr-2" size={16} /> গ্যালারি</a></li></ul></div>
           <div><h3 className="text-white font-bold text-lg mb-6 flex items-center"><span className="w-8 h-1 bg-emerald-500 mr-3 rounded-full"></span> যোগাযোগ</h3><ul className="space-y-5"><li className="flex items-start"><MapPin className="h-5 w-5 mr-3 text-emerald-500 mt-1"/> <span className="text-gray-400 leading-snug">{settings.address}</span></li><li className="flex items-center"><Phone className="h-5 w-5 mr-3 text-emerald-500"/> <span className="text-gray-400">{settings.phone}</span></li><li className="flex items-center"><Mail className="h-5 w-5 mr-3 text-emerald-500"/> <span className="text-gray-400 break-all">{settings.email}</span></li></ul></div>
         </div>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 border-t border-gray-800 text-sm text-center text-gray-500"><p>&copy; {new Date().getFullYear()} আল-লওহা ইসলামিক স্কুল চট্টগ্রাম। সর্বস্বত্ব সংরক্ষিত।</p></div>
+        
+        {/* Footer Bottom with Developed By Credit */}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 border-t border-gray-800 flex flex-col md:flex-row justify-between items-center text-sm">
+          <p className="text-gray-500 mb-4 md:mb-0">&copy; {new Date().getFullYear()} আল-লওহা ইসলামিক স্কুল চট্টগ্রাম। সর্বস্বত্ব সংরক্ষিত।</p>
+          <p className="text-gray-400">
+            Developed by <a href="https://amar-web.netlify.app/" target="_blank" rel="noopener noreferrer" className="text-emerald-400 hover:text-emerald-300 hover:underline font-bold tracking-wider transition-all">amar web</a>
+          </p>
+        </div>
       </footer>
 
-      {alertMsg && (
+      {/* WHATSAPP CONTACT MODAL */}
+      {showContactModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden relative p-8 text-center animate-in fade-in zoom-in duration-200">
-            <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4 text-red-500"><AlertCircle size={32} /></div>
-            <h3 className="text-xl font-bold text-gray-800 mb-2">আবেদন স্থগিত</h3>
-            <p className="text-gray-600 mb-6">{alertMsg}</p>
-            <button onClick={() => setAlertMsg('')} className="bg-emerald-600 text-white font-bold py-3 px-8 rounded-xl hover:bg-emerald-700 w-full shadow-lg">ঠিক আছে</button>
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden relative p-8 text-center animate-in fade-in zoom-in duration-200 border border-gray-100">
+            <button onClick={() => setShowContactModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-800 hover:bg-gray-100 p-2 rounded-full transition-colors"><X size={20} /></button>
+            <div className="w-20 h-20 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-5 text-green-500 shadow-inner">
+               <Phone size={36} />
+            </div>
+            <h3 className="text-2xl font-bold text-gray-800 mb-3">ভর্তির জন্য যোগাযোগ</h3>
+            <p className="text-gray-600 mb-8 font-medium">ভর্তির জন্য এই WhatsApp নম্বর এ যোগাযোগ করুন</p>
+            
+            <a href="https://wa.me/8801616733447" target="_blank" rel="noopener noreferrer" className="bg-[#25D366] text-white font-extrabold py-4 px-8 rounded-2xl hover:bg-[#128C7E] w-full shadow-[0_10px_20px_rgba(37,211,102,0.3)] hover:shadow-[0_10px_25px_rgba(37,211,102,0.5)] flex items-center justify-center text-xl transition-all transform hover:-translate-y-1">
+              <MessageCircle className="mr-3" size={28} /> 01616733447
+            </a>
           </div>
         </div>
       )}
@@ -479,14 +494,19 @@ const CertificateDashboard = ({ db, appId }: any) => {
 
   const handleSearch = async (e: any) => {
     e.preventDefault();
-    if (!scriptUrl) return setErrorMsg('ওয়েব সেটিংস থেকে "Google Script (TC) লিংক" সেট করা নেই!');
+    if (!scriptUrl) {
+      setErrorMsg('ওয়েব সেটিংস থেকে "Google Script (TC) লিংক" সেট করা নেই!');
+      return;
+    }
     setLoading(true); setErrorMsg(''); setStudentData(null);
     try {
       const response = await fetch(`${scriptUrl}?id=${searchId}`);
       const data = await response.json();
       if (data.error) setErrorMsg(data.error);
       else setStudentData(data);
-    } catch (err) { setErrorMsg('ডাটাবেস (Google Sheet) এর সাথে কানেক্ট করা যাচ্ছে না। লিংক চেক করুন।'); }
+    } catch (err) {
+      setErrorMsg('ডাটাবেস (Google Sheet) এর সাথে কানেক্ট করা যাচ্ছে না। লিংক চেক করুন।');
+    }
     setLoading(false);
   };
 
@@ -655,6 +675,7 @@ const CMSDashboard = ({ firebaseUser, db, appId, activeView }: any) => {
             </label>
           </div>
         </div>
+        
         <div className="grid md:grid-cols-2 gap-6 pt-4"><div><label className="block text-sm font-bold text-gray-700 mb-2">ইমেইল ঠিকানা</label><input type="email" value={settings.email} onChange={e=>setSettings({...settings, email: e.target.value})} className="w-full border border-gray-300 p-3.5 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" /></div><div><label className="block text-sm font-bold text-gray-700 mb-2">ফোন নম্বর</label><input type="text" value={settings.phone} onChange={e=>setSettings({...settings, phone: e.target.value})} className="w-full border border-gray-300 p-3.5 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" /></div></div>
         <div><label className="block text-sm font-bold text-gray-700 mb-2">স্কুলের ঠিকানা</label><input type="text" value={settings.address} onChange={e=>setSettings({...settings, address: e.target.value})} className="w-full border border-gray-300 p-3.5 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" /></div>
         <div className="grid md:grid-cols-2 gap-6"><div><label className="block text-sm font-bold text-gray-700 mb-2">ফেসবুক পেজ লিংক</label><input type="url" value={settings.facebook} onChange={e=>setSettings({...settings, facebook: e.target.value})} className="w-full border border-gray-300 p-3.5 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" /></div><div><label className="block text-sm font-bold text-gray-700 mb-2">হোমপেজ ভিডিও</label><input type="url" value={settings.videoUrl} onChange={e=>setSettings({...settings, videoUrl: e.target.value})} placeholder="https://www.youtube.com/embed/..." className="w-full border border-gray-300 p-3.5 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" /></div></div>
@@ -662,32 +683,29 @@ const CMSDashboard = ({ firebaseUser, db, appId, activeView }: any) => {
         <div className="border-t border-gray-200 pt-8 mt-4">
           <h3 className="font-bold text-xl text-gray-800 mb-6 flex items-center"><FileCheck className="mr-2 text-blue-500"/> এক্সটার্নাল লিংক (Google Form & Sheet)</h3>
           <div className="space-y-6">
-            <div><label className="block text-sm font-bold text-gray-700 mb-2">ভর্তি পরীক্ষার ফরম লিংক (Google Form)</label><input type="url" value={settings.admissionTestLink || ''} onChange={e=>setSettings({...settings, admissionTestLink: e.target.value})} className="w-full border border-gray-300 p-3.5 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" placeholder="https://forms.gle/..." /></div>
-            <div><label className="block text-sm font-bold text-gray-700 mb-2">সরাসরি ভর্তির ফরম লিংক (Google Form)</label><input type="url" value={settings.admissionLink || ''} onChange={e=>setSettings({...settings, admissionLink: e.target.value})} className="w-full border border-gray-300 p-3.5 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" placeholder="https://forms.gle/..." /></div>
             <div className="bg-blue-50 p-4 rounded-xl border border-blue-100"><label className="block text-sm font-bold text-blue-900 mb-2">Google Script (TC) লিংক</label><input type="url" value={settings.googleScriptUrl || ''} onChange={e=>setSettings({...settings, googleScriptUrl: e.target.value})} className="w-full border border-blue-200 p-3.5 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" placeholder="https://script.google.com/macros/s/.../exec" /></div>
             <div><label className="block text-sm font-bold text-gray-700 mb-2">গুগোল ম্যাপ এম্বেড লিংক</label><input type="url" value={settings.mapEmbedUrl || ''} onChange={e=>setSettings({...settings, mapEmbedUrl: e.target.value})} className="w-full border border-gray-300 p-3.5 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" placeholder="https://www.google.com/maps/embed?pb=..." /></div>
           </div>
         </div>
 
         <div className="border-t border-gray-200 pt-8 mt-4">
-          <h3 className="font-bold text-xl text-gray-800 mb-6 flex items-center"><Award className="mr-2 text-blue-500"/> স্কুলের বৈশিষ্ট্য (৩টি বক্স)</h3>
+          <h3 className="font-bold text-xl text-gray-800 mb-6 flex items-center"><BookOpen className="mr-2 text-blue-500"/> হোমপেজ ব্যানার কনটেন্ট</h3>
           <div className="space-y-6">
-            <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
-              <input type="text" value={settings.feature1Title || ''} onChange={e=>setSettings({...settings, feature1Title: e.target.value})} className="w-full border border-gray-300 p-3 rounded-lg mb-2 font-bold" placeholder="বক্স ১ এর শিরোনাম"/>
-              <textarea value={settings.feature1Desc || ''} onChange={e=>setSettings({...settings, feature1Desc: e.target.value})} className="w-full border border-gray-300 p-3 rounded-lg" rows={2} placeholder="বক্স ১ এর বর্ণনা"></textarea>
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2">স্কুলের নাম (বড় হেডিং)</label>
+              <input type="text" value={settings.schoolNameBanner || 'আল-লওহা ইসলামিক স্কুল'} onChange={e=>setSettings({...settings, schoolNameBanner: e.target.value})} className="w-full border border-gray-300 p-3.5 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 font-bold" />
             </div>
-            <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
-              <input type="text" value={settings.feature2Title || ''} onChange={e=>setSettings({...settings, feature2Title: e.target.value})} className="w-full border border-gray-300 p-3 rounded-lg mb-2 font-bold" placeholder="বক্স ২ এর শিরোনাম"/>
-              <textarea value={settings.feature2Desc || ''} onChange={e=>setSettings({...settings, feature2Desc: e.target.value})} className="w-full border border-gray-300 p-3 rounded-lg" rows={2} placeholder="বক্স ২ এর বর্ণনা"></textarea>
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2">প্রধান শিরোনাম</label>
+              <input type="text" value={settings.heroTitle} onChange={e=>setSettings({...settings, heroTitle: e.target.value})} className="w-full border border-gray-300 p-3.5 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 font-bold" />
             </div>
-            <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
-              <input type="text" value={settings.feature3Title || ''} onChange={e=>setSettings({...settings, feature3Title: e.target.value})} className="w-full border border-gray-300 p-3 rounded-lg mb-2 font-bold" placeholder="বক্স ৩ এর শিরোনাম"/>
-              <textarea value={settings.feature3Desc || ''} onChange={e=>setSettings({...settings, feature3Desc: e.target.value})} className="w-full border border-gray-300 p-3 rounded-lg" rows={2} placeholder="বক্স ৩ এর বর্ণনা"></textarea>
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2">ছোট বর্ণনা</label>
+              <textarea value={settings.heroSubtitle} onChange={e=>setSettings({...settings, heroSubtitle: e.target.value})} className="w-full border border-gray-300 p-3.5 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" rows={3}></textarea>
             </div>
           </div>
         </div>
 
-        <div className="border-t border-gray-200 pt-8 mt-4"><h3 className="font-bold text-xl text-gray-800 mb-6 flex items-center"><BookOpen className="mr-2 text-blue-500"/> হোমপেজ ব্যানার কনটেন্ট</h3><div className="space-y-6"><div><label className="block text-sm font-bold text-gray-700 mb-2">প্রধান শিরোনাম</label><input type="text" value={settings.heroTitle} onChange={e=>setSettings({...settings, heroTitle: e.target.value})} className="w-full border border-gray-300 p-3.5 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 font-bold" /></div><div><label className="block text-sm font-bold text-gray-700 mb-2">ছোট বর্ণনা</label><textarea value={settings.heroSubtitle} onChange={e=>setSettings({...settings, heroSubtitle: e.target.value})} className="w-full border border-gray-300 p-3.5 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" rows={3}></textarea></div></div></div>
         <div className="pt-4"><button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white px-10 py-4 rounded-xl font-bold shadow-lg transition-transform hover:-translate-y-1">পরিবর্তন সেভ করুন</button></div>
       </form>
     </div>
